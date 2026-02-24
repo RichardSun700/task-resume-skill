@@ -21,6 +21,8 @@ In real assistant workflows, context switching is unavoidable:
 2. **State capture into a queue**
 3. **Automatic resume after current task completion**
 4. **FIFO recovery order + deduplication**
+5. **Default auto-enqueue on non-explicit interruption**
+6. **Unified cross-session queue view (main + clone + group sessions)**
 
 ---
 
@@ -33,8 +35,9 @@ In real assistant workflows, context switching is unavoidable:
   - source channel/session
 - Pop and resume oldest interrupted task (FIFO)
 - Deduplicate near-identical repeated interruptions
-- List and clear queue for operations/debugging
-- Persist queue to workspace memory file
+- List, status, and clear queue for operations/debugging
+- Persist queue to workspace-global memory file shared across sessions
+- Include `source` and `session` metadata for unified observability
 
 Queue file:
 
@@ -62,7 +65,8 @@ python3 skills/task-resume/scripts/task_resume_queue.py add \
   --title "<task title>" \
   --context "<done + exact next step>" \
   --acceptance "<acceptance criteria>" \
-  --source "<session/channel>"
+  --source "<channel>" \
+  --session "<session_key_or_chat_id>"
 ```
 
 ### Pop oldest task (resume target)
@@ -75,6 +79,12 @@ python3 skills/task-resume/scripts/task_resume_queue.py pop
 
 ```bash
 python3 skills/task-resume/scripts/task_resume_queue.py list
+```
+
+### Queue status (unified cross-session view)
+
+```bash
+python3 skills/task-resume/scripts/task_resume_queue.py status
 ```
 
 ### Clear queue
@@ -107,6 +117,16 @@ Everything else can be considered a temporary interruption candidate.
 - Avoid storing sensitive secrets in queue content
 
 ---
+
+## Recent updates
+
+### v1.1 (latest)
+
+- Set **auto-enqueue on interruption** as default behavior
+- Added `--session` to enqueue command
+- Added `status` command for unified queue observability
+- Clarified shared queue behavior across main/clone/group sessions
+- Kept all docs and skill files fully in English
 
 ## Validation performed
 
