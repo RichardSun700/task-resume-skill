@@ -1,0 +1,152 @@
+# task-resume
+
+Automatic interrupted-task resume workflow for OpenClaw agents.
+
+`task-resume` solves a common execution failure: important tasks get interrupted by new requests and never get resumed. This skill adds a deterministic queue + recovery pattern so an agent can finish the current interrupting task and then automatically resume previously interrupted work.
+
+---
+
+## Why this skill exists
+
+In real assistant workflows, context switching is unavoidable:
+
+- A priority task is in progress
+- A user asks something else in the middle
+- The agent switches focus
+- The original task gets dropped
+
+`task-resume` prevents this by enforcing:
+
+1. **Interruption detection**
+2. **State capture into a queue**
+3. **Automatic resume after current task completion**
+4. **FIFO recovery order + deduplication**
+
+---
+
+## Core capabilities
+
+- Queue interrupted tasks with:
+  - title
+  - context (done + exact next step)
+  - acceptance criteria
+  - source channel/session
+- Pop and resume oldest interrupted task (FIFO)
+- Deduplicate near-identical repeated interruptions
+- List and clear queue for operations/debugging
+- Persist queue to workspace memory file
+
+Queue file:
+
+- `memory/task-resume-queue.json`
+
+---
+
+## Files
+
+```text
+task-resume/
+├── SKILL.md
+└── scripts/
+    └── task_resume_queue.py
+```
+
+---
+
+## Command interface
+
+### Add interrupted task
+
+```bash
+python3 skills/task-resume/scripts/task_resume_queue.py add \
+  --title "<task title>" \
+  --context "<done + exact next step>" \
+  --acceptance "<acceptance criteria>" \
+  --source "<session/channel>"
+```
+
+### Pop oldest task (resume target)
+
+```bash
+python3 skills/task-resume/scripts/task_resume_queue.py pop
+```
+
+### List queue
+
+```bash
+python3 skills/task-resume/scripts/task_resume_queue.py list
+```
+
+### Clear queue
+
+```bash
+python3 skills/task-resume/scripts/task_resume_queue.py clear
+```
+
+---
+
+## Recommended policy
+
+Treat these user commands as explicit override (do **not** auto-resume):
+
+- `cancel`
+- `pause`
+- `change priority`
+- `do it tomorrow`
+
+Everything else can be considered a temporary interruption candidate.
+
+---
+
+## Operational guardrails
+
+- Never drop queued tasks silently
+- Always capture a precise next step when enqueueing
+- Deduplicate identical title + context pairs
+- Keep queue bounded (default implementation max: 30)
+- Avoid storing sensitive secrets in queue content
+
+---
+
+## Validation performed
+
+Stress test completed with 3 consecutive interruptions:
+
+- enqueue A, B, C
+- repeat B (dedup check)
+- pop x3
+
+Observed behavior:
+
+- dedup worked (`updated`, queue count unchanged)
+- resume order preserved (A → B → C)
+- queue emptied correctly
+
+---
+
+## Use cases
+
+- Long-form doc editing with frequent side interruptions
+- Multi-step delivery pipelines with strict acceptance criteria
+- Assistants operating across chat groups + DMs
+- Task continuity in noisy real-world conversation streams
+
+---
+
+## Publishing to ClawHub
+
+Package and publish from skill folder:
+
+```bash
+clawhub publish ./skills/task-resume \
+  --slug task-resume \
+  --name "Task Resume" \
+  --version 1.0.0 \
+  --changelog "Initial release: interrupted-task queue and auto-resume workflow"
+```
+
+---
+
+## License
+
+Use and adapt for your OpenClaw workflows.
