@@ -7,6 +7,12 @@ description: Automatic interrupted-task resume workflow with queueing and recove
 
 Use this skill to ensure interrupted tasks are recovered automatically.
 
+## Defaults (MANDATORY)
+
+- Make interruption enqueue the default behavior.
+- On any non-explicit context switch, auto-enqueue the active unfinished task.
+- Use one shared queue file for all sessions/clones so the view is unified.
+
 ## Rules
 
 - Treat user-explicit commands (`cancel`, `pause`, `change priority`, `do it tomorrow`) as overrides.
@@ -15,9 +21,11 @@ Use this skill to ensure interrupted tasks are recovered automatically.
 - After completing the active task, immediately resume the oldest queued interrupted task.
 - If queue is empty, do nothing.
 
-## Queue Storage
+## Shared Queue Storage (cross-session)
 
-- Queue file: `memory/task-resume-queue.json`
+- Canonical queue file: `memory/task-resume-queue.json`
+- This file is workspace-global and shared across main + clone + group sessions.
+- Always pass source with session/channel identity.
 - Use helper script: `scripts/task_resume_queue.py`
 
 ## Interruption Detection
@@ -27,16 +35,17 @@ Consider a task interrupted when all are true:
 2. A new user request is unrelated to finishing that active task.
 3. User did not explicitly cancel/pause/defer the active task.
 
-## On Interruption (enqueue)
+## On Interruption (auto-enqueue)
 
-Run:
+Run immediately:
 
 ```bash
 python3 skills/task-resume/scripts/task_resume_queue.py add \
   --title "<active task title>" \
   --context "<what was done + exact next step>" \
   --acceptance "<acceptance criteria>" \
-  --source "<session/channel>"
+  --source "<channel>" \
+  --session "<session_key_or_chat_id>"
 ```
 
 Then acknowledge briefly: queued + will auto-resume.
@@ -49,13 +58,23 @@ Run:
 python3 skills/task-resume/scripts/task_resume_queue.py pop
 ```
 
-- If one item is returned, resume it immediately and announce: `Resuming previously interrupted task: <title>`. 
+- If one item is returned, resume it immediately and announce: `Resuming previously interrupted task: <title>`.
 - If empty, continue normal flow.
+
+## Unified View
+
+Run:
+
+```bash
+python3 skills/task-resume/scripts/task_resume_queue.py status
+```
+
+This returns total queue count + grouped counts by source/session.
 
 ## Guardrails
 
 - Never drop queued tasks silently.
-- Always include `next_step` quality context when enqueueing.
+- Always include next-step quality context when enqueueing.
 - Deduplicate: if same task title and near-identical context exists in queue, update timestamp instead of appending.
 - Keep queue max size 30; discard oldest overflow items after logging to `memory/YYYY-MM-DD.md`.
 
