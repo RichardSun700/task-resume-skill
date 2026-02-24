@@ -9,7 +9,7 @@ Use this skill to ensure interrupted tasks are recovered automatically.
 
 ## Rules
 
-- Treat user-explicit commands (`取消`, `暂停`, `改优先级`, `明天再做`) as overrides.
+- Treat user-explicit commands (`cancel`, `pause`, `change priority`, `do it tomorrow`) as overrides.
 - Treat all other topic switches as potential interruptions.
 - Before switching topics, persist interruption context to queue.
 - After completing the active task, immediately resume the oldest queued interrupted task.
@@ -49,7 +49,7 @@ Run:
 python3 skills/task-resume/scripts/task_resume_queue.py pop
 ```
 
-- If one item is returned, resume it immediately and announce: `继续之前中断任务：<title>`.
+- If one item is returned, resume it immediately and announce: `Resuming previously interrupted task: <title>`. 
 - If empty, continue normal flow.
 
 ## Guardrails
