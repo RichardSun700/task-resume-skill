@@ -93,6 +93,19 @@ python3 skills/task-resume/scripts/task_resume_queue.py status
 python3 skills/task-resume/scripts/task_resume_queue.py clear
 ```
 
+### Recover from session log (tolerates missing `.jsonl`)
+
+```bash
+python3 skills/task-resume/scripts/task_resume_queue.py recover \
+  --log "~/.openclaw/agents/main/sessions/<session>.jsonl" \
+  --title "<interrupted task title>" \
+  --acceptance "<acceptance criteria>" \
+  --source "<channel>" \
+  --session "<session_key_or_chat_id>"
+```
+
+If the log file does not exist, the command returns `skipped_missing_log` instead of failing.
+
 ---
 
 ## Recommended policy
@@ -120,9 +133,19 @@ Everything else can be considered a temporary interruption candidate.
 
 ## Recent updates
 
-### v1.1 (latest)
+### v1.2 (latest)
+
+- Added `recover` command for log-based recovery flows:
+  - `python3 skills/task-resume/scripts/task_resume_queue.py recover --log <session.jsonl> ...`
+- Added **ENOENT soft-fail** behavior for missing `.jsonl` logs:
+  - missing file is now treated as `skipped_missing_log` (non-fatal), not an alert-grade failure
+- Improved output consistency with structured JSON statuses across commands
+- Preserved queue dedup + FIFO semantics
+
+### v1.1
 
 - Set **auto-enqueue on interruption** as default behavior
+- Added **message-time enforcement**: enqueue before context switch, not only periodic checks
 - Added `--session` to enqueue command
 - Added `status` command for unified queue observability
 - Clarified shared queue behavior across main/clone/group sessions

@@ -9,11 +9,16 @@ QUEUE_PATH = ROOT / "memory" / "task-resume-queue.json"
 MAX_ITEMS = 30
 
 
+def _json_print(payload):
+    print(json.dumps(payload, ensure_ascii=False))
+
+
 def load_queue():
     if not QUEUE_PATH.exists():
         return []
     try:
-        return json.loads(QUEUE_PATH.read_text(encoding="utf-8"))
+        data = json.loads(QUEUE_PATH.read_text(encoding="utf-8"))
+        return data if isinstance(data, list) else []
     except Exception:
         return []
 
@@ -41,7 +46,7 @@ def add_item(title, context, acceptance, source, session):
             if session:
                 item["session"] = session
             save_queue(q)
-            print(json.dumps({"status": "updated", "item": item}, ensure_ascii=False))
+            _json_print({"status": "updated", "item": item})
             return
 
     item = {
@@ -56,26 +61,28 @@ def add_item(title, context, acceptance, source, session):
     }
     q.append(item)
 
+    dropped = []
     if len(q) > MAX_ITEMS:
+        dropped = q[:-MAX_ITEMS]
         q = q[-MAX_ITEMS:]
 
     save_queue(q)
-    print(json.dumps({"status": "added", "item": item}, ensure_ascii=False))
+    _json_print({"status": "added", "item": item, "dropped": dropped})
 
 
 def pop_item():
     q = load_queue()
     if not q:
-        print(json.dumps({"status": "empty"}, ensure_ascii=False))
+        _json_print({"status": "empty"})
         return
     item = q.pop(0)
     save_queue(q)
-    print(json.dumps({"status": "popped", "item": item}, ensure_ascii=False))
+    _json_print({"status": "popped", "item": item})
 
 
 def list_items():
     q = load_queue()
-    print(json.dumps({"status": "ok", "count": len(q), "items": q}, ensure_ascii=False))
+    _json_print({"status": "ok", "count": len(q), "items": q})
 
 
 def status_items():
@@ -87,17 +94,59 @@ def status_items():
         ses = item.get("session") or "unknown"
         by_source[src] = by_source.get(src, 0) + 1
         by_session[ses] = by_session.get(ses, 0) + 1
-    print(json.dumps({
-        "status": "ok",
-        "count": len(q),
-        "by_source": by_source,
-        "by_session": by_session,
-    }, ensure_ascii=False))
+    _json_print(
+        {
+            "status": "ok",
+            "count": len(q),
+            "by_source": by_source,
+            "by_session": by_session,
+        }
+    )
 
 
 def clear_items():
     save_queue([])
-    print(json.dumps({"status": "cleared"}, ensure_ascii=False))
+    _json_print({"status": "cleared"})
+
+
+def recover_from_session_log(log_path: str, title: str, acceptance: str, source: str, session: str):
+    """
+    Robust helper for task-resume recover flows.
+
+    Soft-fail policy:
+    - Missing .jsonl file (ENOENT): skip and return structured status instead of erroring.
+    """
+    path = Path(log_path).expanduser()
+    try:
+        content = path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        _json_print(
+            {
+                "status": "skipped_missing_log",
+                "reason": "ENOENT",
+                "path": str(path),
+                "message": "Session log missing; skipped recovery without alert.",
+            }
+        )
+        return
+    except Exception as e:
+        _json_print(
+            {
+                "status": "error",
+                "reason": type(e).__name__,
+                "path": str(path),
+                "message": str(e),
+            }
+        )
+        return
+
+    lines = [ln for ln in content.splitlines() if ln.strip()]
+    tail = "\n".join(lines[-8:]) if lines else ""
+    context = (
+        "Recovered from session log tail.\n"
+        f"Next step: resume last interrupted action from this context.\n{tail}"
+    )
+    add_item(title=title, context=context, acceptance=acceptance, source=source, session=session)
 
 
 if __name__ == "__main__":
@@ -116,6 +165,13 @@ if __name__ == "__main__":
     sub.add_parser("status")
     sub.add_parser("clear")
 
+    p_recover = sub.add_parser("recover")
+    p_recover.add_argument("--log", required=True, help="Path to session .jsonl log")
+    p_recover.add_argument("--title", required=True)
+    p_recover.add_argument("--acceptance", default="")
+    p_recover.add_argument("--source", default="")
+    p_recover.add_argument("--session", default="")
+
     args = p.parse_args()
 
     if args.cmd == "add":
@@ -128,3 +184,5 @@ if __name__ == "__main__":
         status_items()
     elif args.cmd == "clear":
         clear_items()
+    elif args.cmd == "recover":
+        recover_from_session_log(args.log, args.title, args.acceptance, args.source, args.session)

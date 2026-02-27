@@ -11,6 +11,7 @@ Use this skill to ensure interrupted tasks are recovered automatically.
 
 - Make interruption enqueue the default behavior.
 - On any non-explicit context switch, auto-enqueue the active unfinished task.
+- Enqueue at message-time (immediately when interruption is detected), not only on periodic checks.
 - Use one shared queue file for all sessions/clones so the view is unified.
 
 ## Rules
@@ -35,9 +36,33 @@ Consider a task interrupted when all are true:
 2. A new user request is unrelated to finishing that active task.
 3. User did not explicitly cancel/pause/defer the active task.
 
+## Message-Time Enforcement (required)
+
+Before handling every new user message:
+1. Check whether an active task exists and is unfinished.
+2. If the incoming message is an unrelated request and no explicit override is present, enqueue immediately.
+3. Only then switch to the new request.
+
+This prevents queue misses caused by timing gaps.
+
+## Log-based Recovery (ENOENT-safe)
+
+When recovery needs session `.jsonl` context, use:
+
+```bash
+python3 skills/task-resume/scripts/task_resume_queue.py recover \
+  --log "~/.openclaw/agents/main/sessions/<session>.jsonl" \
+  --title "<active task title>" \
+  --acceptance "<acceptance criteria>" \
+  --source "<channel>" \
+  --session "<session_key_or_chat_id>"
+```
+
+If the log file is missing (`ENOENT`), treat it as expected and continue (`skipped_missing_log`), do not raise alert-level failure.
+
 ## On Interruption (auto-enqueue)
 
-Run immediately:
+Run immediately at interruption detection:
 
 ```bash
 python3 skills/task-resume/scripts/task_resume_queue.py add \
